@@ -8,8 +8,8 @@ publish = false
 path = "test.rs"
 
 [dependencies]
-miniserde = { path = "../..", default-features = false }
+miniserde-miku = { path = "../..", default-features = false }
 
 [features]
 default = ["std"]
-std = ["miniserde/std"]
+std = ["miniserde-miku/std"]
