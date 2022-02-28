@@ -9,6 +9,8 @@ Miniserde
 *Prototype of a data structure serialization library with several opposite
 design goals from [Serde](https://serde.rs).*
 
+*small fork/patch version to use an arrayvec/arraystring for serialization*
+
 As a prototype, this library is not a production quality engineering artifact
 the way Serde is. At the same time, it is more than a proof of concept and
 should be totally usable for the range of use cases that it targets, which is

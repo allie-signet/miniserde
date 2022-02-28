@@ -1,8 +1,7 @@
 use crate::ser::{Fragment, Map, Seq, Serialize};
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
+use arrayvec::{ArrayVec, ArrayString};
 
 /// Serialize any serializable type into a JSON string.
 ///
@@ -25,12 +24,12 @@ use alloc::vec::Vec;
 ///     println!("{}", j);
 /// }
 /// ```
-pub fn to_string<T: ?Sized + Serialize>(value: &T) -> String {
-    to_string_impl(&value)
+pub fn to_string<T: ?Sized + Serialize, const CAP: usize, const LAYER_CAP: usize>(value: &T, out: &mut ArrayString<CAP>) {
+    to_string_impl::<CAP, LAYER_CAP>(&value, out);
 }
 
-struct Serializer<'a> {
-    stack: Vec<Layer<'a>>,
+struct Serializer<'a, const LAYER_CAP: usize> {
+    stack: ArrayVec<Layer<'a>, LAYER_CAP>,
 }
 
 enum Layer<'a> {
@@ -38,7 +37,7 @@ enum Layer<'a> {
     Map(Box<dyn Map + 'a>),
 }
 
-impl<'a> Drop for Serializer<'a> {
+impl<'a, const LAYER_CAP: usize> Drop for Serializer<'a, LAYER_CAP> {
     fn drop(&mut self) {
         // Drop layers in reverse order.
         while !self.stack.is_empty() {
@@ -47,16 +46,15 @@ impl<'a> Drop for Serializer<'a> {
     }
 }
 
-fn to_string_impl(value: &dyn Serialize) -> String {
-    let mut out = String::new();
-    let mut serializer = Serializer { stack: Vec::new() };
+fn to_string_impl<const CAP: usize, const LAYER_CAP: usize>(value: &dyn Serialize, out: &mut ArrayString<CAP>) {
+    let mut serializer = Serializer { stack: ArrayVec::<_, LAYER_CAP>::new() };
     let mut fragment = value.begin();
 
     loop {
         match fragment {
             Fragment::Null => out.push_str("null"),
             Fragment::Bool(b) => out.push_str(if b { "true" } else { "false" }),
-            Fragment::Str(s) => escape_str(&s, &mut out),
+            Fragment::Str(s) => escape_str(&s, out),
             Fragment::U64(n) => out.push_str(itoa::Buffer::new().format(n)),
             Fragment::I64(n) => out.push_str(itoa::Buffer::new().format(n)),
             Fragment::F64(n) => {
@@ -84,7 +82,7 @@ fn to_string_impl(value: &dyn Serialize) -> String {
                 match unsafe { extend_lifetime!(map.next() as Option<(Cow<str>, &dyn Serialize)>) }
                 {
                     Some((key, first)) => {
-                        escape_str(&key, &mut out);
+                        escape_str(&key, out);
                         out.push(':');
                         serializer.stack.push(Layer::Map(map));
                         fragment = first.begin();
@@ -115,7 +113,7 @@ fn to_string_impl(value: &dyn Serialize) -> String {
                     } {
                         Some((key, next)) => {
                             out.push(',');
-                            escape_str(&key, &mut out);
+                            escape_str(&key, out);
                             out.push(':');
                             fragment = next.begin();
                             break;
@@ -123,7 +121,7 @@ fn to_string_impl(value: &dyn Serialize) -> String {
                         None => out.push('}'),
                     }
                 }
-                None => return out,
+                None => return,
             }
             serializer.stack.pop();
         }
@@ -132,7 +130,7 @@ fn to_string_impl(value: &dyn Serialize) -> String {
 
 // Clippy false positive: https://github.com/rust-lang/rust-clippy/issues/5169
 #[allow(clippy::zero_prefixed_literal)]
-fn escape_str(value: &str, out: &mut String) {
+fn escape_str<const CAP: usize>(value: &str, out: &mut ArrayString<CAP>) {
     out.push('"');
 
     let bytes = value.as_bytes();

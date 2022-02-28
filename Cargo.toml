@@ -1,5 +1,5 @@
 [package]
-name = "miniserde"
+name = "miniserde-miku"
 version = "0.1.22"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 license = "MIT OR Apache-2.0"
@@ -14,6 +14,7 @@ rust-version = "1.36"
 itoa = "1.0"
 mini-internal = { version = "=0.1.22", path = "derive" }
 ryu = "1.0"
+arrayvec = "0.7.2"
 
 [dev-dependencies]
 automod = "1.0"
